@@ -16,8 +16,8 @@ An exercise in implementing [logistic regression](component_3/log_reg.cpp) and [
 ## Portfolio Component 4: Searching for Similarity
 
 A four-part exercise in utilizing search by similarity models and comparing them to previously explored models.
-[Report](component_4/Searching_for_Similarity_NarrativeDoc.docx)
-[Regression](Regression.pdf)
-[Classification](Classification.pdf)
-[Clustering](Clustering.Rmd)
+[Report](component_4/Searching_for_Similarity_NarrativeDoc.docx) |
+[Regression](Regression.pdf) |
+[Classification](Classification.pdf) |
+[Clustering](Clustering.Rmd) |
 [Dimensionality Reduction](Dimensionality_Reduction.pdf)
