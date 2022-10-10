@@ -1,0 +1,112 @@
+---
+title: "Searching for Similarity: Classification"
+author: "Isabelle Kirby, Bridgette Bryant, Rikita Patangay, Zuhayr Ali"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+First we have to unzip the archive (they are large data sets nearly 100k games). Then we will save them into data frames.
+
+```{r}
+library(pvclust)
+library(flexclust)
+library(fpc)
+library(cluster)
+
+win_stats_df <- read.csv((unz("League_Data/league_korea_high_elo_team_stats.zip", "win_team_stats.csv")))
+lose_stats_df <- read.csv((unz("League_Data/league_korea_high_elo_team_stats.zip", "lose_team_stats.csv")))
+
+str(win_stats_df)
+str(lose_stats_df)
+```
+Then we combine each dataframe by their corresponding gameID.
+```{r}
+# Replacing column names for rbind
+colnames(win_stats_df) <- c('kill1', 'kill2', 'kill3', 'kill4', 'kill5', 'death1', 'death2', 'death3', 'death4', 'death5', 'totalDamageDealtToChampions1', 'totalDamageDealtToChampions2', 'totalDamageDealtToChampions3', 'totalDamageDealtToChampions4', 'totalDamageDealtToChampions5', 'goldEarned1', 'goldEarned2', 'goldEarned3', 'goldEarned4', 'goldEarned5', 'visionScore1', 'visionScore2', 'visionScore3', 'visionScore4', 'visionScore5', 'totalTimeCrowdControlDealt1', 'totalTimeCrowdControlDealt2', 'totalTimeCrowdControlDealt3', 'totalTimeCrowdControlDealt4', 'totalTimeCrowdControlDealt5', 'gameId')
+colnames(lose_stats_df) <- c('kill1', 'kill2', 'kill3', 'kill4', 'kill5', 'death1', 'death2', 'death3', 'death4', 'death5', 'totalDamageDealtToChampions1', 'totalDamageDealtToChampions2', 'totalDamageDealtToChampions3', 'totalDamageDealtToChampions4', 'totalDamageDealtToChampions5', 'goldEarned1', 'goldEarned2', 'goldEarned3', 'goldEarned4', 'goldEarned5', 'visionScore1', 'visionScore2', 'visionScore3', 'visionScore4', 'visionScore5', 'totalTimeCrowdControlDealt1', 'totalTimeCrowdControlDealt2', 'totalTimeCrowdControlDealt3', 'totalTimeCrowdControlDealt4', 'totalTimeCrowdControlDealt5', 'gameId')
+
+# Adding column based on dataset it is in
+library(dplyr)
+
+win_stats_df <- win_stats_df %>%
+  mutate(won=1)
+
+lose_stats_df <- lose_stats_df %>%
+  mutate(won =0)
+
+#full_stats_df <- merge(win_stats_df, lose_stats_df, by = "gameId")
+full_stats_df <- rbind(win_stats_df, lose_stats_df)
+drop <- c("gameId")
+full_stats_df <- full_stats_df[,!(names(full_stats_df) %in% drop)]
+str(full_stats_df)
+```
+The data has too many columns for the algorithms to process efficiently, so I combined and deleted redundant columns ( went from 31 columns to seven).
+```{r}
+set.seed(1010)
+i <- sample(1:nrow(full_stats_df), .75*nrow(full_stats_df), replace=FALSE)
+full_stats_smol <- full_stats_df[-i,]
+
+lolDataless <- full_stats_smol %>% rowwise() %>% mutate(TotalKill = sum(c_across(kill1:kill5)))
+
+lolDataless <- lolDataless %>% rowwise() %>% mutate(TotalDeath = sum(c_across(death1:death5)))
+
+lolDataless <- lolDataless %>% rowwise() %>% mutate(TotalDamage = sum(c_across(totalDamageDealtToChampions1:totalDamageDealtToChampions5)))
+
+lolDataless <- lolDataless %>% rowwise() %>% mutate(TotalGold = sum(c_across(goldEarned1:goldEarned5)))
+
+lolDataless <- lolDataless %>% rowwise() %>% mutate(TotalVision = sum(c_across(visionScore1:visionScore5)))
+
+lolDataless <- lolDataless %>% rowwise() %>% mutate(TotalCrowdControl = sum(c_across(totalTimeCrowdControlDealt1:totalTimeCrowdControlDealt5)))
+
+drop <- c('kill1', 'kill2', 'kill3', 'kill4', 'kill5', 'death1', 'death2', 'death3', 'death4', 'death5', 'totalDamageDealtToChampions1', 'totalDamageDealtToChampions2', 'totalDamageDealtToChampions3', 'totalDamageDealtToChampions4', 'totalDamageDealtToChampions5', 'goldEarned1', 'goldEarned2', 'goldEarned3', 'goldEarned4', 'goldEarned5', 'visionScore1', 'visionScore2', 'visionScore3', 'visionScore4', 'visionScore5', 'totalTimeCrowdControlDealt1', 'totalTimeCrowdControlDealt2', 'totalTimeCrowdControlDealt3', 'totalTimeCrowdControlDealt4', 'totalTimeCrowdControlDealt5')
+
+lolDataless = lolDataless[, !(names(lolDataless) %in% drop)]
+
+
+```
+
+After manipulating datasets, we perform the kmeans on the data.
+```{r}
+set.seed(1234)
+lolCluster <- kmeans( lolDataless, 5)
+lolCluster
+```
+This is another way to show how the clustering happened.
+```{r}
+table(lolCluster$cluster, lolDataless$won)
+```
+Now to plot the kmeans.
+```{r}
+plot(lolDataless$TotalDamage, lolDataless$TotalKill, pch=21, bg=c("red", "orange", "yellow" , "green", "blue" )[unclass(lolCluster$cluster)], main="League of Legends Dataset")
+
+plot(lolDataless$TotalDamage, lolDataless$TotalCrowdControl, pch=21, bg=c("red", "orange", "yellow" , "green", "blue" )[unclass(lolCluster$cluster)], main="League of Legends Dataset")
+
+plot(lolDataless$TotalGold, lolDataless$TotalVision, pch=21, bg=c("red", "orange", "yellow" , "green", "blue" )[unclass(lolCluster$cluster)], main="League of Legends Dataset")
+```
+
+
+
+Finally its time for the hierarchical clustering.
+```{r}
+j <- sample(1:nrow(lolDataless), .75*nrow(lolDataless), replace=FALSE)
+lolDatalessSmol <- lolDataless[-j,]
+full.scaled <- scale(lolDatalessSmol)
+
+d <- dist(full.scaled)
+fit.average <- hclust(d, method="complete")
+plot(fit.average, hang=-1, cex=.8, main="Hierarchical Clustering")
+```
+This is the third algorithm. I chose the pvclust algorithm that calculates the p-values and a hierarchical clustering.
+```{r}
+tlolDataless <- t(lolDataless)
+fit2 <- pvclust(tlolDataless, method.hclust = "ward", method.dist = "euclidean")
+plot(fit2)
+pvrect(fit2, alpha=.95)
+```
+
+Overall, I felt as though I understood kmeans more than I understood hierarchical clustering (HC). For this data set, the HC makes little to no sense, possibly due to the abundance of rows and columns.The kmeans shows similarities and differences between players, highlighting the one (yellow) who may have played a healer role (leading to less impressive damage and kill stats) or was simply a new player. Hierarchical clustering didn't seem to be very useful for this data set. Even after altering the number of columns in the data set, the hierarchical clustering doesn't seem to be able to handle the number of columns or the large variance in the data. The cluster dendrogram with p-value clustered the total damage and the total gold together, implying that there is a correlation between the two, and clustered the total crowd control, vision, kill, death and whether or not they won grouped together.
+
+

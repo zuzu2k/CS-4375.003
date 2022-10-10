@@ -1,0 +1,103 @@
+---
+title: "Searching for Similarity: Dimensionality Reduction"
+author: "Isabelle Kirby, Bridgette Bryant, Rikita Patangay, Zuhayr Ali"
+output: 
+  pdf_document: default
+  html_document: default
+---
+
+# **Dimensionality Reduction for Korea's top high elo teams in League of Legends**
+
+I utilized dimensionality reduction to examine the dataset. It is used to reduced the training data into less varaiables and re-examine it. It is commonly used on datasets that have large numbers of observations such as the dataset we have which has over 100k values. -Rikita
+
+
+## Organizing the data
+We have to start out by cleaning the data meaning organize it in the way we want to explore it. We will start off by unzipping the archive and save the seperate dataset files into data frames.
+```{r}
+win_stats_df <- read.csv((unz("League_Data/league_korea_high_elo_team_stats.zip", "win_team_stats.csv")))
+
+lose_stats_df <- read.csv((unz("League_Data/league_korea_high_elo_team_stats.zip", "lose_team_stats.csv")))
+
+str(win_stats_df)
+
+str(lose_stats_df)
+
+```
+
+The below functions will merge the win_stats_df and lose_stats_df together based of the gameId column and if it matches. The model will then be able to categorize our data by team 0 or team 1. This way it is easier to examine the winning teams because of the differing values.
+
+```{r}
+# Replacing column names for rbind
+colnames(win_stats_df) <- c('kill1', 'kill2', 'kill3', 'kill4', 'kill5', 'death1', 'death2', 'death3', 'death4', 'death5', 'totalDamageDealtToChampions1', 'totalDamageDealtToChampions2', 'totalDamageDealtToChampions3', 'totalDamageDealtToChampions4', 'totalDamageDealtToChampions5', 'goldEarned1', 'goldEarned2', 'goldEarned3', 'goldEarned4', 'goldEarned5', 'visionScore1', 'visionScore2', 'visionScore3', 'visionScore4', 'visionScore5', 'totalTimeCrowdControlDealt1', 'totalTimeCrowdControlDealt2', 'totalTimeCrowdControlDealt3', 'totalTimeCrowdControlDealt4', 'totalTimeCrowdControlDealt5', 'gameId')
+colnames(lose_stats_df) <- c('kill1', 'kill2', 'kill3', 'kill4', 'kill5', 'death1', 'death2', 'death3', 'death4', 'death5', 'totalDamageDealtToChampions1', 'totalDamageDealtToChampions2', 'totalDamageDealtToChampions3', 'totalDamageDealtToChampions4', 'totalDamageDealtToChampions5', 'goldEarned1', 'goldEarned2', 'goldEarned3', 'goldEarned4', 'goldEarned5', 'visionScore1', 'visionScore2', 'visionScore3', 'visionScore4', 'visionScore5', 'totalTimeCrowdControlDealt1', 'totalTimeCrowdControlDealt2', 'totalTimeCrowdControlDealt3', 'totalTimeCrowdControlDealt4', 'totalTimeCrowdControlDealt5', 'gameId')
+# Adding column based on dataset it is in
+library(dplyr)
+
+win_stats_df <- win_stats_df %>%
+  mutate(won=1)
+lose_stats_df <- lose_stats_df %>%
+  mutate(won =0)
+
+#full_stats_df <- merge(win_stats_df, lose_stats_df, by = "gameId")
+full_stats_df <- rbind(win_stats_df, lose_stats_df)
+drop <- c("gameId")
+full_stats_df <- full_stats_df[,!(names(full_stats_df) %in% drop)]
+str(full_stats_df)
+```
+
+Next let's randomly divide the data into train and test:
+
+```{r}
+set.seed(1010)
+i <- sample(1:nrow(full_stats_df), .75*nrow(full_stats_df), replace=FALSE)
+full_stats_train <- full_stats_df[i,]
+full_stats_test <- full_stats_df[-i,]
+```
+
+## Dimensionality Reduction:
+
+### Principal Components Analysis:
+We will now perform a PCA (Principal Components Analysis)
+
+
+```{r}
+library(caret)
+pca_out <- preProcess(full_stats_train[,1:31],method=c("center","scale","pca"))
+pca_out
+```
+
+We see that PCA reduced the 31 variables to 20 principal components. These twenty components
+capture 95% of the variance in the data.
+
+### Linear Discriminant Analysis
+We will now perform a LDA (Linear Discriminant Analysis)
+
+
+```{r}
+library(MASS)
+options(max.print = 10000)  
+lda1 <- lda(kill1~., data=full_stats_train)
+summary(lda1$means)
+```
+
+## Logistic Regression on reduced data
+
+Here we will perform logistic regression on the dataset to be able to compare the difference of accuracy between the PCA and data set.
+
+```{r}
+glm_won <- glm(won~., data=full_stats_train, family = "binomial")
+summary(glm_won)
+```
+
+After evaluating on the dataset we can see that...
+
+```{r}
+library(caret)
+glm_probs <- predict(glm_won, newdata = full_stats_test, type = "response")
+glm_pred <- ifelse(glm_probs > 0.5, 1, 0)
+glm_acc <- mean(glm_pred == full_stats_test$won)
+confusionMatrix(as.factor(glm_pred), reference = as.factor(full_stats_test$won))
+```
+
+
+The logistic regression model shows an accuracy of 95.5% and the PCA also brings an accuracy of 95%. This is very hopeful. The accuracy was not lost with the data.

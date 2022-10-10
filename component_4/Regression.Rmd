@@ -1,0 +1,166 @@
+---
+title: "Searching for Similarity: Regression"
+author: "Zuhayr Ali, Bridgette Byrant, Isabelle Kirby, Rikita Patangay"
+date: "2022-10-09"
+output: pdf_document
+---
+
+# Regression on Steam's top 200 thousand players
+This notebook will be exploring a dataset of stats of the top ranked 200 thousand players on the Steam platform (obtained from this link) <https://www.kaggle.com/datasets/patrickgendotti/steam-achievementstatscom-rankings>, with the goal of determining the rank of a player based on other statistics.
+
+## Cleaning data
+We start by importing the dataset.
+
+```{r}
+df <- read.csv("amended_first_200k_players.csv")
+str(df)
+```
+
+Additionally we must check for any missing values. All columns are full except for the "All" column, but due to a lack of documentation on what that column represents we will not be using that column.
+
+```{r}
+sapply(df, function(x) sum(is.na(x)==TRUE))
+```
+
+In fact, the data source does not provide any documentation on what any of the columns represent. We will thus trim the dataset to only include numeric value columns with an interpretable title.
+
+```{r}
+df <- df[c(2,6,8,9,11,12,14)]
+str(df)
+```
+
+The dataset is split by an 80/20 ratio for training and testing respectively.
+
+```{r}
+set.seed(1010)
+i <-sample(1:nrow(df), nrow(df)*0.80, replace=FALSE)
+train <- df[i,]
+test <- df[-i,]
+```
+
+## Data exploration
+Now for some data exploration.
+
+```{r}
+head(train)
+tail(train)
+
+range(train$Points)
+mean(train$Points)
+median(train$Points)
+
+range(train$Games)
+mean(train$Games)
+median(train$Games)
+
+range(train$Badges)
+mean(train$Badges)
+median(train$Badges)
+```
+
+Here are also some plots to compare the correlation of factors.
+
+```{r}
+plot(train$Points, train$XP)
+plot(train$Hours, train$Badges)
+plot(train$X100., train$Badges)
+plot(train$Points, train$X100.)
+plot(train$XP, train$Badges)
+plot(train$Games, train$Badges)
+```
+
+Computing the correlation matrix of all columns shows us that most of the variables don't have a strong correlation with each other - only the pair of "Points" and "x100." columns showed an absolute correlation higher than 0.7 with approximately 0.83, while the next two strongest correlations are approximately 0.67 and -0.6.
+
+```{r}
+cor(df)
+```
+We will now train 3 different types of regression models on the dataset - linear regression, kNN regression, and decision tree regression.
+
+## Linear regression
+
+### Training
+```{r}
+lm1 <- lm(Rank~Points+X100., data=train)
+summary(lm1)
+```
+
+### Residual plots
+```{r}
+par(mfrow=c(2,2))
+plot(lm1)
+```
+
+### Testing and evaluation
+```{r}
+pred1 <- predict(lm1, newdata=test)
+
+cor1 <- cor(pred1, test$Rank)
+mse1 <- mean((pred1-test$Rank)^2) 
+rmse1 <- sqrt(mse1)
+
+print(paste('correlation:', cor1))
+print(paste('mse:', mse1))
+print(paste('rmse:', rmse1))
+```
+
+## kNN regression
+
+### Normalization
+```{r}
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+df_norm <- as.data.frame(lapply(df[, 1:7], normalize))
+head(df_norm)
+
+i <-sample(1:nrow(df), nrow(df)*0.80, replace=FALSE)
+train_norm <- df_norm[i,]
+test_norm <- df_norm[-i,]
+```
+
+### Training, testing, and evaluation
+```{r}
+library(caret)
+
+cor_k <- rep(0, 10)
+mse_k <- rep(0, 10)
+i <- 1
+for (k in seq(1, 19, 2)){
+fit_k <- knnreg(train_norm[,2:7],train_norm[,1], k=k)
+pred_k <- predict(fit_k, test_norm[,2:7])
+cor_k[i] <- cor(pred_k, test_norm$Rank)
+mse_k[i] <- mean((pred_k - test_norm$Rank)^2)
+i <- i + 1
+}
+
+print(paste('max cor_k:', 2*which.max(cor_k)-1))
+print(paste('min mse_k:', 2*which.min(mse_k)-1))
+
+k_index <- (which.max(cor_k)+which.min(mse_k))/2
+
+print(paste('correlation:', cor_k[k_index]))
+print(paste('mse:', mse_k[k_index]))
+```
+
+## Decision tree regression
+
+### Training and tree formation
+```{r}
+library(tree)
+
+tree1 <- tree(Rank~Points+X100., data=train)
+summary(tree1)
+
+plot(tree1)
+text(tree1, cex=0.75, pretty=0)
+```
+
+### Testing and evaluation
+```{r}
+pred3 <- predict(tree1, newdata=test)
+
+print(paste('correlation:', cor(pred3, test$Rank)))
+rmse_tree <- sqrt(mean((pred3-test$Rank)^2))
+print(paste('rmse:', rmse_tree))
+```
