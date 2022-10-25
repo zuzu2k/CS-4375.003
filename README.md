@@ -17,7 +17,15 @@ An exercise in implementing [logistic regression](component_3/log_reg.cpp) and [
 
 A four-part exercise in utilizing search by similarity models and comparing them to previously explored models.
 [Report](component_4/Searching_for_Similarity_NarrativeDoc.docx) |
-[Regression](Regression.pdf) |
-[Classification](Classification.pdf) |
-[Clustering](Clustering.Rmd) |
-[Dimensionality Reduction](Dimensionality_Reduction.pdf)
+[Regression](component_4/Regression.pdf) |
+[Classification](component_4/Classification.pdf) |
+[Clustering](component_4/Clustering.Rmd) |
+[Dimensionality Reduction](component_4/Dimensionality_Reduction.pdf)
+
+## Portfolio Component 5: Kernel and Ensemble Methods
+
+A three-part exercise in exploring SVM and a comparison of ensemble methods.
+[Report](component_5/CS4375.003_SVMEnsemble_Narrative.docx) |
+[SVM Regression](component_5/CS4375.003_SimonKim_sxk190106_SVM_Regression.pdf) |
+[SVM Classification](component_5/CS4375.003_SimonKim_sxk190106_SVM_Classification.pdf) |
+[Ensemble Methods](component_5/Ensemble.pdf)
