@@ -1,0 +1,195 @@
+---
+title: "SVM_Regression"
+Author: "Simon Kim"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-10-22"
+---
+
+
+### Dataset
+
+It was hard to find good dataset for ML.Therefore I will use Diamond dataset from ggplot2
+
+```{r}
+library(ggplot2)
+data("diamonds")
+df=diamonds
+colnames(df)
+str(df)
+
+```
+
+50k dataset, so i will cut 10k row for faster run.
+```{r}
+
+df <- df[1:10000,]
+str(df)
+
+
+```
+
+### divide train/test
+Use 80% of df as train set and 20% for test set.
+Also, for faster svm control, i am gonna use another dataset with sampled 100 row of df, since 1k+ row data crashes during tuning in my computer.
+
+
+```{r}
+
+set.seed(1234)
+i <- sample(1:nrow(df), 0.8*nrow(df), replace=FALSE)
+train <- df[i,]
+test <- df[-i,]
+set.seed(1235)
+j <- sample(1:nrow(df), 0.01*nrow(df), replace=FALSE)
+t_sample<-df[j,]
+str(t_sample)
+```
+
+### Data exploration
+1. look at the training data statistically
+```{r}
+summary(train)
+
+```
+
+2.  look at the training data graphically
+```{r}
+pairs(train)
+
+```
+
+### SVM Regression
+
+This time, i will predict price from carat, depth, table, x,y,z.
+
+##build svm model
+
+tune parameters according to kernel.
+Here, i will use t_sample dataset from above to reduce tuning time. 
+```{r}
+library(e1071)
+model1 <- tune.svm(price~carat+depth+table+x+y+z,data=t_sample, kernel="radial",gamma=2^(-5:0), cost=2^(0:4))
+model2 <- tune.svm(price~carat+depth+table+x+y+z,data=t_sample,kernel="linear",gamma=2^(-5:0),cost=2^(0:4))
+model3 <- tune.svm(price~carat+depth+table+x+y+z,data=t_sample, kernel="polynomial",gamma=2^(-5:0),cost=2^(0:4))
+
+model1$best.parameters
+model2$best.parameters
+model3$best.parameters
+```
+
+so, using these best parameters for each kernel, I can model svm.
+
+```{r}
+
+svm1<-svm(price~carat+depth+table+x+y+z,data=train, kernel="radial",gamma=0.03125, cost=1)
+svm2<-svm(price~carat+depth+table+x+y+z,data=train, kernel="linear",gamma=0.03125, cost=4)
+svm3<-svm(price~carat+depth+table+x+y+z,data=train, kernel="polynomial", gamma=0.03125, cost =1)
+```
+
+check result of each cases
+
+```{r}
+summary(svm1)
+summary(svm2)
+summary(svm3)
+```
+
+from the model, predict accuracy with test dataset and visualize.  
+
+```{r}
+
+svmpredict1<-predict(object = svm1, newdata= test)
+svmpredict2<-predict(object = svm2, newdata= test)
+svmpredict3<-predict(object = svm3, newdata= test)
+#svm1
+corsvm1<- cor(svmpredict1,test$price)
+msesvm1<- mean((svmpreict1=test$price)^2)
+rmsesvm1<- sqrt(msesvm1)
+print(paste('correlation:', corsvm1))
+print(paste('mse:', msesvm1))
+print(paste('rmse:', rmsesvm1))
+#svm2
+corsvm2<- cor(svmpredict2,test$price)
+msesvm2<- mean((svmpreict2=test$price)^2)
+rmsesvm2<- sqrt(msesvm2)
+print(paste('correlation:', corsvm2))
+print(paste('mse:', msesvm2))
+print(paste('rmse:', rmsesvm2))
+
+#svm3
+corsvm3<- cor(svmpredict3,test$price)
+msesvm3<- mean((svmpreict3=test$price)^2)
+rmsesvm3<- sqrt(msesvm3)
+print(paste('correlation:', corsvm3))
+print(paste('mse:', msesvm3))
+print(paste('rmse:', rmsesvm3))
+
+```
+
+
+| Model  | Correlation | RMSE | 
+|:--- | :------: | :------: |  
+|Radial | 0.922938630010805 | 3556.40287685465| 
+|Linear |  0.916359733472687 | 3556.40287685465| 
+|Polynomial|0.856428582070373 | 3556.40287685465 | 
+
+
+Radial kerner showed the best accuracy and polynomial the worst.
+
+what if we don't use tuned parameter?
+
+
+```{r}
+dsvm1<-svm(price~carat+depth+table+x+y+z,data=train, kernel="radial")
+dsvm2<-svm(price~carat+depth+table+x+y+z,data=train, kernel="linear")
+dsvm3<-svm(price~carat+depth+table+x+y+z,data=train, kernel="polynomial")
+summary(dsvm1)
+summary(dsvm2)
+summary(dsvm3)
+
+dsvmpredict1<-predict(object = dsvm1, newdata= test)
+dsvmpredict2<-predict(object = dsvm2, newdata= test)
+dsvmpredict3<-predict(object = dsvm3, newdata= test)
+#svm1
+cordsvm1<- cor(dsvmpredict1,test$price)
+msedsvm1<- mean((dsvmpreict1=test$price)^2)
+rmsedsvm1<- sqrt(msedsvm1)
+print(paste('correlation:', cordsvm1))
+print(paste('mse:', msedsvm1))
+print(paste('rmse:', rmsedsvm1))
+#svm2
+cordsvm2<- cor(dsvmpredict2,test$price)
+msedsvm2<- mean((dsvmpreict2=test$price)^2)
+rmsedsvm2<- sqrt(msedsvm2)
+print(paste('correlation:', cordsvm2))
+print(paste('mse:', msedsvm2))
+print(paste('rmse:', rmsedsvm2))
+
+#svm3
+cordsvm3<- cor(dsvmpredict3,test$price)
+msedsvm3<- mean((dsvmpreict3=test$price)^2)
+rmsedsvm3<- sqrt(msedsvm3)
+print(paste('correlation:', cordsvm3))
+print(paste('mse:', msedsvm3))
+print(paste('rmse:', rmsedsvm3))
+
+```
+
+| Model  | Correlation | RMSE | 
+|:--- | :------: | :------: |  
+|Radial | 0.922938630010805 | 3556.40287685465| 
+|Radial default | 0.930808002142208 | 3556.40287685465| 
+|Linear |  0.916359733472687 | 3556.40287685465| 
+|Linear default |  0.916340292383689 | 3556.40287685465| 
+|Polynomial| 0.856428582070373 | 3556.40287685465 | 
+|Polynomial default| 0.883782251440509 | 3556.40287685465 | 
+
+From default value, accuracy of radial kernel increased 1%p and polynomial kernel increased 3%p.
+From this result, we can say that there was a problem of tuning with 100 sample that 100 samples cannot represent the full 10k data or underfiting had occurred this time. 
+
+However, the result of accuracy rank didn't change. This is because radial svm is for higher(over 4D) dimension dataset.
+Polynomial kernel uses (x,y) -> (xy2^0.5,x^2,y^2) to calculate 2D data as 3D data. Since we used 7 features from Diamond dataset, polynomial function should have been weak.
+
+

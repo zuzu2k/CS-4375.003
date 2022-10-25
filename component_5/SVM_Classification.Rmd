@@ -1,0 +1,184 @@
+---
+title: "SVM_Classification"
+output:
+  pdf_document: default
+  html_document: default
+date: "2022-10-23"
+Author: Simon Kim
+---
+
+### Dataset
+
+It was hard to find good dataset for ML.Therefore I will use Diamond dataset from ggplot2 again for classification.
+
+```{r}
+library(ggplot2)
+data("diamonds")
+df=diamonds
+colnames(df)
+str(df)
+
+```
+
+50k dataset, so i will cut 10k row for faster run.
+```{r}
+
+df <- df[1:10000,]
+str(df)
+
+
+```
+
+### Data Cleaning
+Using classification, i will find cut from carat, depth, table, x,y,z values.
+
+Before classification, for better and faster result, i am going to factor dataset a bit.
+
+```{r}
+help("diamonds")
+
+```
+From description, we can find that cut has 5 level-fair, good, very good, ideal and premium.
+Here, I will divide level into 2 level, premium+ideal vs fair,good,very good.
+
+```{r}
+df$cut_status<-NA
+df$cut_status[df$cut=='Fair'|df$cut=='Good'|df$cut=='Very Good']=0
+df$cut_status[df$cut=='Premium'|df$cut=='Ideal']=1
+df$cut_status=as.factor(df$cut_status)
+
+```
+
+### divide train/test
+Use 80% of df as train set and 20% for test set.
+Also, for faster svm control, i am gonna use another dataset with sampled 100 row of df, since 1k+ row data crashes during tuning in my computer.
+
+
+```{r}
+
+set.seed(1234)
+i <- sample(1:nrow(df), 0.8*nrow(df), replace=FALSE)
+train <- df[i,]
+test <- df[-i,]
+set.seed(1235)
+j <- sample(1:nrow(df), 0.01*nrow(df), replace=FALSE)
+t_sample<-df[j,]
+str(t_sample)
+```
+
+### Data exploration
+1. look at the training data statistically
+```{r}
+summary(train)
+
+```
+
+2.  look at the training data graphically
+```{r}
+pairs(train)
+
+```
+
+### SVM Classification
+
+
+
+##build svm model
+
+tune parameters according to kernel.
+Here, i will use t_sample dataset from above to reduce tuning time. 
+```{r}
+library(e1071)
+model1 <- tune.svm(cut_status~carat+depth+table+x+y+z,data=t_sample, kernel="radial",gamma=2^(-5:0), cost=2^(0:4))
+model2 <- tune.svm(cut_status~carat+depth+table+x+y+z,data=t_sample,kernel="linear",gamma=2^(-5:0),cost=2^(0:4))
+model3 <- tune.svm(cut_status~carat+depth+table+x+y+z,data=t_sample, kernel="polynomial",gamma=2^(-5:0),cost=2^(0:4))
+
+model1$best.parameters
+model2$best.parameters
+model3$best.parameters
+```
+
+so, using these best parameters for each kernel, I can model svm.
+
+```{r}
+
+svm1<-svm(cut_status~carat+depth+table+x+y+z,data=train, kernel="radial",gamma=0.25, cost=4)
+svm2<-svm(cut_status~carat+depth+table+x+y+z,data=train, kernel="linear",gamma=0.03125, cost=16)
+svm3<-svm(cut_status~carat+depth+table+x+y+z,data=train, kernel="polynomial", gamma=1, cost =2)
+```
+
+check result of each cases
+
+```{r}
+summary(svm1)
+summary(svm2)
+summary(svm3)
+```
+
+from the model, predict accuracy with test dataset and visualize.  
+
+```{r}
+
+svmpredict1<-predict(object = svm1, newdata= test)
+svmpredict2<-predict(object = svm2, newdata= test)
+svmpredict3<-predict(object = svm3, newdata= test)
+
+#svm1
+table(svmpredict1,test$cut_status)
+mean(svmpredict1==test$cut_status)
+#svm2
+table(svmpredict2,test$cut_status)
+mean(svmpredict2==test$cut_status)
+#svm3
+table(svmpredict3,test$cut_status)
+mean(svmpredict3==test$cut_status)
+```
+
+
+| Model  | Accuracy |  
+|:--- | :------: | 
+|Radial | 0.8695 | 
+|Linear |  0.7505 | 
+|Polynomial|0.775 | 
+
+
+Radial kerner showed the best accuracy and Linear the worst.
+
+what if we don't use tuned parameter?
+
+
+```{r}
+dsvm1<-svm(cut_status~carat+depth+table+x+y+z,data=train, kernel="radial")
+dsvm2<-svm(cut_status~carat+depth+table+x+y+z,data=train, kernel="linear")
+dsvm3<-svm(cut_status~carat+depth+table+x+y+z,data=train, kernel="polynomial")
+summary(dsvm1)
+summary(dsvm2)
+summary(dsvm3)
+
+dsvmpredict1<-predict(object = dsvm1, newdata= test)
+dsvmpredict2<-predict(object = dsvm2, newdata= test)
+dsvmpredict3<-predict(object = dsvm3, newdata= test)
+#dsvm1
+table(dsvmpredict1,test$cut_status)
+mean(dsvmpredict1==test$cut_status)
+#dsvm2
+table(dsvmpredict2,test$cut_status)
+mean(dsvmpredict2==test$cut_status)
+#dsvm3
+table(dsvmpredict3,test$cut_status)
+mean(dsvmpredict3==test$cut_status)
+
+```
+
+| Model  | Accuracy |  
+|:--- | :------: | 
+|Radial | 0.8695 | 
+|Radial default| 0.8535 |
+|Linear |  0.7505 | 
+|Linear default |  0.748 | 
+|Polynomial|0.775 | 
+|Polynomial default|0.7015| 
+
+This time, models using best parameter of sampled dataset showed better result. Unlike regression, classification predicts descrete data therefore it was easier to represent original dataset with sampled dataset.
+
+As we saw from SVM regression, radial model made the best prediction. this is because we used 6features to predict 1 feature, or the dataset is 7D. radial svm is for higher(over 4D) dimension dataset. Polynomial kernel uses (x,y) -> (xy2^0.5,x^2,y^2) to calculate 2D data as 3D data, and this was the reason that polynomial model was hard to predict 7D data.
