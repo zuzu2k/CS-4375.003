@@ -1,0 +1,194 @@
+---
+title: "Ensemble Methods"
+author: "Zuhayr Ali, Simon Kim"
+date: "2022-10-22"
+output: pdf_document
+---
+
+# Classification on 10 thousand diamonds from ggplot2's "diamonds"
+This notebook will be exploring the "diamonds" dataset from ggplot2 with the goal of predicting the cut quality based on other statistics.
+
+## Cleaning data
+We start by loading the dataset and displaying the columns. There is readily available documentation explaining each column. Like in the SVM classification notebook, we will determine cut quality from carat, depth, table, and the x-y-z dimensions.
+
+```{r}
+library(mltools)
+library(ggplot2)
+
+data("diamonds")
+df=diamonds
+colnames(df)
+str(df)
+```
+
+The amount of rows is too much for the algorithms to run in time at over 50 thousand rows, so the data has been pruned to the first 10 thousand.
+
+```{r}
+df <- df[1:10000,]
+str(df)
+```
+
+Again like in the SVM classification notebook, we will group the 5 classes of cut quality into 2 superclasses to make this dataset work for binary classification.
+
+```{r}
+df$cut_status<-NA
+df$cut_status[df$cut=='Fair'|df$cut=='Good'|df$cut=='Very Good']=0
+df$cut_status[df$cut=='Premium'|df$cut=='Ideal']=1
+df$cut_status=as.factor(df$cut_status)
+```
+
+We split the dataset into 80/20 train and test subsets.
+
+```{r}
+set.seed(1234)
+i <- sample(1:nrow(df), 0.8*nrow(df), replace=FALSE)
+train <- df[i,]
+test <- df[-i,]
+```
+
+## Data exploration
+A statistical breakdown of each column...
+
+```{r}
+summary(train)
+```
+
+... followed by a correlation matrix of all columns.
+
+```{r}
+pairs(train)
+```
+
+We will now use 3 ensemble methods for classification and compare them to decision tree classification as a baseline.
+
+## Decision tree
+
+### Training and tree plot
+```{r}
+library(tree)
+
+dtree_start <- Sys.time()
+dtree <- tree(cut_status~carat+depth+table+x+y+z, data=train)
+dtree_end <- Sys.time()
+
+plot(dtree)
+text(dtree, cex=0.75, pretty=0)
+
+summary(dtree)
+print(paste('time:', dtree_end - dtree_start, 'seconds'))
+```
+
+### Testing and evaluation
+```{r}
+dtree_pred <- predict(dtree, newdata=test, type="class")
+
+table(dtree_pred, test$cut_status)
+
+acc_dtree <- mean(dtree_pred==test$cut_status)
+mcc_dtree <- mcc(factor(dtree_pred), test$cut_status)
+
+print(paste('accuracy:', acc_dtree))
+print(paste("mcc=", mcc_dtree))
+```
+
+## Random forest
+
+### Training
+```{r}
+library(randomForest)
+rf_start <- Sys.time()
+rf <- randomForest(cut_status~carat+depth+table+x+y+z, data=train, importance=TRUE)
+rf_end <- Sys.time()
+
+rf
+print(paste('time:', rf_end - rf_start, 'seconds'))
+```
+
+### Testing and evaluation
+```{r}
+rf_pred <- predict(rf, newdata=test, type="response")
+
+acc_rf <- mean(rf_pred==test$cut_status)
+mcc_rf <- mcc(factor(rf_pred), test$cut_status)
+
+print(paste("accuracy:", acc_rf))
+print(paste("mcc=", mcc_rf))
+```
+
+## XGBoost
+
+### Testing
+```{r}
+library(xgboost)
+
+train_label <- ifelse(train$cut_status==1, 1, 0)
+train_matrix <- data.matrix(train[, -11])
+
+test_label <- ifelse(test$cut_status==1, 1, 0)
+test_matrix <- data.matrix(test[, -11])
+
+xg_start <- Sys.time()
+xg <- xgboost(data=train_matrix, label=train_label, nrounds=5, objective='binary:logistic')
+xg_end <- Sys.time()
+
+print(paste('time:', xg_end - xg_start, 'seconds'))
+```
+
+### Testing and evaluation
+```{r}
+xg_probs <- predict(xg, test_matrix)
+xg_pred <- ifelse(xg_probs>0.5, 1, 0)
+
+acc_xg <- mean(xg_pred==test_label)
+mcc_xg <- mcc(factor(xg_pred), test$cut_status)
+
+print(paste("accuracy:", acc_xg))
+print(paste("mcc=", mcc_xg))
+```
+
+## Light GBM
+
+### Data prep
+```{r}
+library(caret)
+library(lightgbm)
+
+df$cut_status <- as.numeric(df$cut_status)-1
+
+train = as.matrix(df[i, ])
+test = as.matrix(df[-i, ])
+
+train_x = train[, -11]
+train_y = train[, 11]
+
+test_x = test[, -11]
+test_y = test[, 11]
+
+dtrain = lgb.Dataset(train_x, label = train_y)
+dtest = lgb.Dataset.create.valid(dtrain, data = test_x, label = test_y)
+
+lgbm_params = list(objective = "binary", num_leaves = 4L, learning_rate = 1.0)
+```
+
+# Training
+```{r}
+lgbm_start <- Sys.time()
+lgbm <- lgb.train(lgbm_params, dtrain, nrounds = 10L, verbose = -1L)
+lgbm_end <- Sys.time()
+
+print(paste('time:', lgbm_end - lgbm_start, 'seconds'))
+```
+
+### Testing and evaluation
+```{r}
+lgbm_probs = predict(lgbm, test_x, reshape=T)
+lgbm_pred = ifelse(lgbm_probs>0.5, 1, 0)
+
+confusionMatrix(as.factor(test_y), as.factor(lgbm_pred))
+
+mcc_lgbm <- mcc(factor(lgbm_pred), factor(test_y))
+print(paste("mcc=", mcc_lgbm))
+```
+
+## Comparison
+While the decision tree does a capable job of predicting cut quality, it produces the worst results of all methods and is the 2nd slowest to train at over 34 milliseconds. The accuracy is only 78.9% and the correlation is less than 0.6. The first ensemble method, random forests, is a marked improvement in results but at the cost of speed. The accuracy is 86.95% and the correlation is slightly above 0.73, but it takes nearly 3 and a half seconds to train. the second ensemble method, XGBoost performs the best of the methods in this notebook without any serious competition. For a slight improvement in training speed over the decision tree at over 25 milliseconds, both the accuracy and correlation are perfect at 100% and 1 respectively. The final ensemble method, light GBM, produces the worst results of the ensemble methods but is still better than decision trees, and ties with XGBoost for the best speed. The accuracy is 82.9% and the correlation is less than 0.65.
