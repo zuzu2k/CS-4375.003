@@ -29,3 +29,7 @@ A three-part exercise in exploring SVM and a comparison of ensemble methods.
 [SVM Regression](component_5/CS4375.003_SimonKim_sxk190106_SVM_Regression.pdf) |
 [SVM Classification](component_5/CS4375.003_SimonKim_sxk190106_SVM_Classification.pdf) |
 [Ensemble Methods](component_5/Ensemble.pdf)
+
+## Portfolio Component 6: ML with SKLearn
+
+An introduction to machine learning in the Python language using the scikit-learn library, presented [in this document](component_6/ml_with_sklearn.pdf).
