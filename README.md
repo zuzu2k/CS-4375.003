@@ -32,4 +32,8 @@ A three-part exercise in exploring SVM and a comparison of ensemble methods.
 
 ## Portfolio Component 6: ML with SKLearn
 
-An introduction to machine learning in the Python language using the scikit-learn library, presented [in this document](component_6/ml_with_sklearn.pdf).
+An introduction to machine learning in Python using the scikit-learn library, presented [in this document](component_6/ml_with_sklearn.pdf).
+
+## Portfolio Component 7: Image Classification
+
+An attempt to use Keras in Python to train and test 3 deep learning models with the goal of classifying images in the CIFAR100 dataset, presented [in this document](component_7/image_classification.pdf).
